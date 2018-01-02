@@ -1,0 +1,170 @@
+#!/bin/bash
+## SP config script
+
+# inputs
+while getopts b:cm:o:p option; do
+    case "${option}" in
+        b) SP_BUILD=${OPTARG};;
+        c) SP_COVERAGE="y";;
+        m) SP_MATRIX_OPS=${OPTARG};;
+        o) SP_OPT=${OPTARG};;
+        p) SP_PARALLEL="y";;
+    esac
+done
+
+if [ -z ${CC+x} ]; then 
+    CC=gcc
+fi
+if [ -z ${CXX+x} ]; then 
+    CXX=g++
+fi
+if [ -z ${FC+x} ]; then 
+    FC=gfortran
+fi
+
+if [[ !(-z ${KEITH_DEV_SETTINGS+x}) ]]; then
+    CC=gcc-mp-7
+    CXX=g++-mp-7
+    FC=gfortran-mp-7
+fi
+
+# compiler checks
+
+IS_DARWIN=$($CXX -dumpmachine 2>&1 | grep -i -c "darwin")
+APPLE_COMPILER=$($CXX --version 2>&1 | grep -i -c -E 'apple llvm')
+
+IS_FAST_OPT=0
+
+# announcements
+
+echo ""
+if [[ "${SP_BUILD}" == "dev" ]]; then
+    echo "SP: dev version"
+fi
+
+if [[ "${SP_COVERAGE}" == "y" ]]; then 
+    echo "SP: coverage build"
+fi
+
+# get working directory
+WDIR=${PWD}
+
+# look for Armadillo
+if [ -z ${ARMA_INCLUDE_PATH+x} ]; then
+    echo ""
+    if [ -f ${WDIR}/include/armadillo ]; then 
+        ARMA_INCLUDE_PATH="./include"
+    elif [ -f /usr/include/armadillo ]; then
+        ARMA_INCLUDE_PATH="/usr/include"
+    elif [ -f /usr/local/include/armadillo ]; then
+        ARMA_INCLUDE_PATH="/usr/local/include"
+    elif [ -f /opt/include/armadillo ]; then
+        ARMA_INCLUDE_PATH="/opt/include"
+    elif [ -f /opt/local/include/armadillo ]; then
+        ARMA_INCLUDE_PATH="/opt/local/include"
+    else 
+        echo "SP: cannot find armadillo files. Cloning from GitHub"
+        echo ""
+
+        mkdir ${WDIR}/arma_tmp
+        git clone -b unstable --single-branch https://github.com/conradsnicta/armadillo-code ${WDIR}/arma_tmp
+        mv ${WDIR}/arma_tmp/include/* ${WDIR}/include
+        rm -rf ${WDIR}/arma_tmp
+        ARMA_INCLUDE_PATH="./include"
+
+        echo ""
+    fi
+fi
+
+echo "SP: ARMA_INCLUDE_PATH set to ${ARMA_INCLUDE_PATH}"
+
+# set build and optimization flags
+
+if [[ "${SP_COVERAGE}" == "y" ]]; then 
+    SP_OPT_FLAGS="-g -O0 -Wall --coverage -fno-inline -fno-inline-small-functions -fno-default-inline"
+else
+    if [[ "${SP_OPT}" == "fast" ]]; then
+        echo "SP: experimental optimization; use of NaN or +/-Inf not recognized"
+
+        IS_FAST_OPT=1
+
+        SP_OPT_FLAGS="-Ofast -march=native -DARMA_NO_DEBUG"
+    elif [[ "${SP_OPT}" == "native" ]]; then
+        IS_FAST_OPT=1
+
+        SP_OPT_FLAGS="-O3 -march=native -DARMA_NO_DEBUG"
+    else
+        SP_OPT_FLAGS="-O3"
+    fi
+
+    if [[ "${SP_PARALLEL}" == "y" ]]; then
+        echo "SP: using OpenMP"
+        SP_OPT_FLAGS="${SP_OPT_FLAGS} -fopenmp -DSP_USE_OMP"
+    fi
+fi
+
+SP_WARN_FLAGS="-Wall"
+
+# shared library name and install path
+
+SP_SHLIB_NAME="libsp.so"
+
+if [[ !("${SP_BUILD}" == "dev") ]]; then
+    if [ -z ${SP_INSTALL_PATH+x} ]; then
+        SP_INSTALL_PATH="/usr/local"
+    fi
+    echo ""
+    echo "SP: install path set to ${SP_INSTALL_PATH}"
+fi
+
+if [[ $OSTYPE == darwin* ]] ; then
+    if [[ "${SP_BUILD}" == "dev" ]]; then
+        SP_SHLIB_FLAGS="-dynamiclib -install_name ${WDIR}/${SP_SHLIB_NAME} -Wl,-headerpad_max_install_names -undefined dynamic_lookup -single_module -multiply_defined suppress"
+    else
+        SP_SHLIB_FLAGS="-dynamiclib -install_name ${SP_INSTALL_PATH}/lib/${SP_SHLIB_NAME} -Wl,-headerpad_max_install_names -undefined dynamic_lookup -single_module -multiply_defined suppress"
+    fi
+
+    SP_BLAS_LAPACK="-framework Accelerate"
+elif [[ $OSTYPE == *linux* ]] ; then
+    SP_OPT_FLAGS="-fPIC ${SP_OPT_FLAGS}"
+
+    if [[ "${SP_BUILD}" == "dev" ]]; then
+        SP_SHLIB_FLAGS="-fPIC -shared -L${WDIR} -Wl,-Bsymbolic-functions -Wl,-z,relro "
+    else
+        SP_SHLIB_FLAGS="-fPIC -shared -L${SP_INSTALL_PATH}/lib -Wl,-Bsymbolic-functions -Wl,-z,relro"
+    fi
+
+    SP_BLAS_LAPACK="-lblas -llapack"
+else
+    SP_BLAS_LAPACK="-lblas -llapack"
+fi
+
+if [[ !(-z ${SP_MATRIX_OPS+x}) ]]; then
+    SP_BLAS_LAPACK="${SP_MATRIX_OPS}"
+    echo ""
+    echo "SP: BLAS and Lapack libraries set to ${SP_BLAS_LAPACK}"
+fi
+
+if [[ "${SP_COVERAGE}" == "y" ]]; then 
+    SP_SHLIB_FLAGS="--coverage ${SP_SHLIB_FLAGS}"
+else
+    SP_SHLIB_FLAGS="${SP_OPT_FLAGS} ${SP_SHLIB_FLAGS}"
+fi
+
+if [ "$IS_FAST_OPT" -eq "1" ] && [ "$IS_DARWIN" -eq "1" ] && [ "$APPLE_COMPILER" -eq "0" ]; then
+    echo ""
+    echo "SP: To enable AVX features, your compiler will use the Apple LLVM assembler"
+    SP_OPT_FLAGS="-Wa,-q ${SP_OPT_FLAGS}"
+fi
+
+sed -e "s|@CC@|${CC}|" \
+    -e "s|@CXX@|${CXX}|" \
+    -e "s|@FC@|${FC}|" \
+    -e "s|@ARMA_INCLUDE_PATH@|${ARMA_INCLUDE_PATH}|" \
+    -e "s|@SP_BLAS_LAPACK@|${SP_BLAS_LAPACK}|" \
+    -e "s|@SP_WARN_FLAGS@|${SP_WARN_FLAGS}|" \
+    -e "s|@SP_OPT_FLAGS@|${SP_OPT_FLAGS}|" \
+    -e "s|@SP_SHLIB_NAME@|${SP_SHLIB_NAME}|" \
+    -e "s|@SP_SHLIB_FLAGS@|${SP_SHLIB_FLAGS}|" \
+    -e "s|@SP_INSTALL_PATH@|${SP_INSTALL_PATH}|" \
+    Makefile.in > Makefile

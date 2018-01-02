@@ -1,0 +1,59 @@
+
+# core compiling options
+
+CC  = @CC@
+CXX = @CXX@
+FC  = @FC@
+
+CXX_STD = -std=c++11
+OPT_FLAGS = @SP_WARN_FLAGS@ @SP_OPT_FLAGS@
+
+ARMA_INCLUDE_PATH = @ARMA_INCLUDE_PATH@
+
+# install location
+INSTALL_PATH=@SP_INSTALL_PATH@
+
+# source directories
+SDIR = .
+SP_DIR = $(SDIR)
+SP_SRC_DIR = $(SDIR)/src
+SP_HEADER_DIR = $(SDIR)/include
+
+# shared library name and flags
+SHLIB = @SP_SHLIB_NAME@
+SHLIB_FLAGS = $(CXX_STD) @SP_SHLIB_FLAGS@
+
+# general flags
+CXXFLAGS = $(CXX_STD) $(OPT_FLAGS) -I$(ARMA_INCLUDE_PATH) -I$(SP_HEADER_DIR)
+LIBS= @SP_BLAS_LAPACK@
+
+# core SP files
+
+SOURCES_SP= $(SP_SRC_DIR)/dijkstra.cpp
+OBJECTS_SP= $(SOURCES_SP:.cpp=.o)
+
+all: $(SP_DIR)/$(SHLIB) $(OBJECTS_SP)
+
+# core SP files
+$(SP_SRC_DIR)/%.o: $(SP_SRC_DIR)/%.cpp
+	$(CXX) $(CXXFLAGS) $< -c -o $@
+
+# shared library
+$(SP_DIR)/$(SHLIB): $(OBJECTS_SP)
+	$(CXX) $(SHLIB_FLAGS) -o $@ $^ $(LIBS)
+
+# cleanup and install
+.PHONY: clean
+clean:
+	@rm -f *.so ./tests/*.test ./tests/*.o $(SP_SRC_DIR)/*.o $(SP_SRC_DIR)/*.gcov $(SP_SRC_DIR)/*.gcno $(SP_SRC_DIR)/*.gcda $(SP_SRC_DIR)/*.dSYM $(SP_SRC_DIR)/*/*.o $(SP_SRC_DIR)/*/*.gcov $(SP_SRC_DIR)/*/*.gcno $(SP_SRC_DIR)/*/*.gcda $(SP_SRC_DIR)/*/*.dSYM
+
+.PHONY: vclean
+vclean:
+	@rm -f *.so ./tests/*.test ./tests/*.o $(SP_SRC_DIR)/*.o $(SP_SRC_DIR)/*/*.o
+	@rm -rf ./include/armadillo*
+
+.PHONY: install
+install: $(SHLIB)
+	@cp $(SP_DIR)/$(SHLIB) $(INSTALL_PATH)/lib/$(SHLIB)
+	@mkdir -p $(INSTALL_PATH)/include/mcmc
+	@cp -r $(SP_DIR)/include/* $(INSTALL_PATH)/include/mcmc
