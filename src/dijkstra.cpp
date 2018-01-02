@@ -52,10 +52,10 @@ sp::dijkstra::compute_paths(const int source_ind, const graph_t& node_list, std:
 	        if (distance_through_u < min_distance[v]) {
                 vertex_queue.erase(std::make_pair(min_distance[v], v));
     
-                min_distance[v] = distance_through_u;
+                min_distance[v] = std::move(distance_through_u);
                 path_list[v] = u;
 
-                vertex_queue.insert(std::make_pair(min_distance[v], v));
+                vertex_queue.insert(std::make_pair(min_distance[v], std::move(v)));
             }
         }
     }
