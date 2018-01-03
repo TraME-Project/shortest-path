@@ -43,6 +43,19 @@ int main()
     std::cout << "Path: ";
     std::copy(path.begin(), path.end(), std::ostream_iterator<int>(std::cout, " -> "));
     std::cout << std::endl;
+
+    // use Bellman-Ford
+
+    std::cout << std::endl;
  
+    sp::bellman_ford::compute_paths(source_ind, arc_list, min_distance, path_list);
+
+    std::cout << "Distance from " << source_ind << " to " << dest_ind << " = " << min_distance[4] << std::endl;
+    path = sp::dijkstra::get_shortest_path(4, path_list);
+    
+    std::cout << "Path: ";
+    std::copy(path.begin(), path.end(), std::ostream_iterator<int>(std::cout, " -> "));
+    std::cout << std::endl;
+
     return 0;
 }

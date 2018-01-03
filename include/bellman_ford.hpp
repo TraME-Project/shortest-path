@@ -16,33 +16,8 @@
   ##
   ################################################################################*/
 
-#include <iostream>
-#include <vector>
-#include <string>
-#include <list>
- 
-#include <limits>
- 
-#include <set>
-#include <utility>
-#include <algorithm>
-#include <iterator>
+namespace bellman_ford {
 
-#ifdef USE_RCPP_ARMADILLO
-    #include <RcppArmadillo.h>
-#else
-    #ifndef ARMA_DONT_USE_WRAPPER
-        #define ARMA_DONT_USE_WRAPPER
-    #endif
-    #include "armadillo"
-#endif
-
-namespace sp {
-
-    #include "sp_structs.hpp"
-    #include "sp_misc.hpp"
-
-    #include "bellman_ford.hpp"
-    #include "dijkstra.hpp"
+    void compute_paths(const int source_ind, const graph_t& node_list, std::vector<double>& min_distance, std::vector<int>& path_list);
 
 }

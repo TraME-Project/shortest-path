@@ -29,7 +29,7 @@ LIBS= @SP_BLAS_LAPACK@
 
 # core SP files
 
-SOURCES_SP= $(SP_SRC_DIR)/dijkstra.cpp
+SOURCES_SP= $(SP_SRC_DIR)/bellman_ford.cpp $(SP_SRC_DIR)/dijkstra.cpp
 OBJECTS_SP= $(SOURCES_SP:.cpp=.o)
 
 all: $(SP_DIR)/$(SHLIB) $(OBJECTS_SP)
