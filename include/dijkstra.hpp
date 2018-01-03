@@ -19,6 +19,5 @@
 namespace dijkstra {
 
     void compute_paths(const int source_ind, const graph_t& node_list, std::vector<double>& min_distance, std::vector<int>& path_list);
-    std::list<int> get_shortest_path(int vertex, const std::vector<int>& path_list, const int min_vertex_val = -1);
 
 }
